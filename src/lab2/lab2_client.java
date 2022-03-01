@@ -17,6 +17,12 @@ import javax.crypto.spec.DESKeySpec;
 
 import java.io.*;
 
+/* This class represents a client attempting to connect to the server
+ * by sending its ID encrypted with a master key using DES encryption
+ * Upon receiving a response from the server, it will decrypt the message
+ * using the master key and then send a response to the server containing
+ * the server's ID, encrypted with the server key as a form of authentication
+ */
 public class lab2_client {
 	
 	// packet size for sending/receiving

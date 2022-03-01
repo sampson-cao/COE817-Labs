@@ -5,6 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import javax.crypto.*;
 
+/* This code demonstrates DES encryption in Java
+ * The bytes for the user input, resulting ciphertext,
+ * and decrypted message will be shown
+ */
 public class JEncryptDES {
 
 	public static void main(String args[]) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,

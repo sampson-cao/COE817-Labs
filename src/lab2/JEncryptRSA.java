@@ -13,6 +13,11 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
 public class JEncryptRSA {
+	
+	/* This code demonstrates RSA encryption in Java
+	 * The bytes for the user input, resulting ciphertext,
+	 * and decrypted message will be shown
+	 */
 
 	public static void main(String args[]) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
 			IllegalBlockSizeException, BadPaddingException {

@@ -1,6 +1,7 @@
 package lab2;
 
 import java.io.IOException;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
@@ -18,6 +19,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.DESKeySpec;
 
+/* This class represents a server which authenticates the user
+ * Upon receiving an DES encrypted message from a client, it will decrypt the message
+ * using the master key and then send a response to the client containing
+ * the client's ID, the server's ID, and the server's key.
+ * The server then waits for the server's ID encrypted with the server's key
+ * to be sent back.
+ */
 public class lab2_server {
 	
 	// packet size for sending/receiving
