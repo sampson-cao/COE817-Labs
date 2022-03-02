@@ -16,6 +16,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.RSAPublicKeySpec;
 
+import javax.crypto.SecretKey;
+
 public class Lab3SecureChatServer {
 
 	final static private int PACKET_SIZE = 1024;
@@ -37,18 +39,17 @@ public class Lab3SecureChatServer {
 
 	public Lab3SecureChatServer() {
 		try {
-			keyGeneration();
+			generateKey();
 			createServer();
 			if (connect()) {
 				// do stuff
 			}
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
-	void keyGeneration() throws NoSuchAlgorithmException {
+	void generateKey() throws NoSuchAlgorithmException {
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
 		KeyPair kp = kpg.genKeyPair();
 		puKey = kp.getPublic();
@@ -79,11 +80,11 @@ public class Lab3SecureChatServer {
 		}
 	}
 	
-	PublicKey getClientKey() {
+	SecretKey getSessionKey() {
 		
 	}
 	
-	void sendMessage(String msg, boolean encrypt) {
+	void sendMessage(byte[] msg, boolean encrypt) {
 		
 	}
 
@@ -91,4 +92,13 @@ public class Lab3SecureChatServer {
 		Lab3SecureChatServer server = new Lab3SecureChatServer();
 	}
 
+	// Helper function for printing byte array into hex values
+	public static void printBytesAsHex(byte[] byteArr) {
+		StringBuilder byteArray = new StringBuilder();
+		for (byte b : byteArr) {
+			byteArray.append(String.format("%02X ", b));
+		}
+		System.out.println(byteArray);
+	}
+	
 }
