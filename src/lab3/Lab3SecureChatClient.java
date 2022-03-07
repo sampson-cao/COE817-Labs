@@ -3,7 +3,6 @@ package lab3;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -16,8 +15,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 
 import javax.crypto.BadPaddingException;
@@ -32,6 +34,7 @@ public class Lab3SecureChatClient {
 	final static private int PACKET_SIZE = 1024;
 	final static private String ADDRESS = "0.0.0.0";
 	final static private int PORT = 8000;
+	final static private String CLIENT_ID = "client";
 
 	// Key-related objects
 	Cipher cipherDES = null;
@@ -49,26 +52,58 @@ public class Lab3SecureChatClient {
 
 	// Buffer array representing a packet
 	private byte[] buf = new byte[PACKET_SIZE];
+	// Message array representing the byte form of a message
+	private byte[] byteMsg = new byte[PACKET_SIZE];
+	// Message String representing the string form of a message
+	private String strMsg = "";
 
-	private byte[] msg = new byte[PACKET_SIZE];
+	// Verification variables
+	private int ctr = 0;
+	private ZonedDateTime timeStamp;
 
 	public Lab3SecureChatClient() {
 		try {
+			initializeCiphers();
+			generateSessionKey();
 			generateKey();
 			if (connect()) {
+				// Start of Asymmetric key distribution
 				// Send public key to server
 				sendMessage(puKey.getEncoded());
 				printBytesAsHex(puKey.getEncoded());
 
 				// Receive server's public key
-				buf = input.readNBytes(PACKET_SIZE);
-				msg = unpad(buf);
-				serverKey = createPublicKey(msg);
-				System.out.println("Server public key retrieved:");
-				printBytesAsHex(msg);
+				readMessage();
+				serverKey = createPublicKey(byteMsg);
+
+				// Start of Symmetric key distribution
+				// Step 1: Send client ID and nonce to server
+				strMsg = generateNonce();
+				System.out.println("Message: " + strMsg);
+				byteMsg = strMsg.getBytes();
+				byteMsg = encryptRSA(byteMsg);
+				sendMessage(byteMsg);
+				printBytesAsHex(byteMsg);
+
+				// Step 2: Receive nonce2 from server
+				readMessage();
+				byteMsg = decryptRSA(byteMsg);
+				strMsg = new String(byteMsg, StandardCharsets.UTF_8);
+				parseNonce(strMsg.split(",")[1]);
+
+				// Step 3: Send nonce3 back to server
+				strMsg = generateNonce();
+				System.out.println("Message: " + strMsg);
+				byteMsg = strMsg.getBytes();
+				byteMsg = encryptRSA(byteMsg);
+				sendMessage(byteMsg);
+				printBytesAsHex(byteMsg);
 				
-				
-				
+				// Step 4: Send session key
+				byteMsg = encryptRSA(sessionKey.getEncoded(), false);
+				byteMsg = encryptRSA(byteMsg);
+				printBytesAsHex(byteMsg);
+				sendMessage(byteMsg);
 
 			}
 		} catch (Exception e) {
@@ -84,6 +119,7 @@ public class Lab3SecureChatClient {
 
 	void generateKey() throws NoSuchAlgorithmException {
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+		kpg.initialize(1024);
 		KeyPair kp = kpg.genKeyPair();
 		puKey = kp.getPublic();
 		prKey = kp.getPrivate();
@@ -117,6 +153,13 @@ public class Lab3SecureChatClient {
 		}
 	}
 
+	void readMessage() throws IOException {
+		System.out.println("Message Received: ");
+		buf = input.readNBytes(PACKET_SIZE);
+		printBytesAsHex(buf);
+		byteMsg = unpad(buf);
+	}
+
 	void sendMessage(byte[] msg) throws IOException {
 		if (msg.length <= PACKET_SIZE) {
 			buf = Arrays.copyOf(msg, PACKET_SIZE);
@@ -145,7 +188,7 @@ public class Lab3SecureChatClient {
 		cipherDES.init(Cipher.ENCRYPT_MODE, sessionKey);
 
 		System.out.println("Byte Array to encrypt: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
+		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
 		printBytesAsHex(byteArr);
 
 		output = cipherDES.doFinal(byteArr);
@@ -163,7 +206,7 @@ public class Lab3SecureChatClient {
 		cipherDES.init(Cipher.DECRYPT_MODE, sessionKey);
 
 		System.out.println("Byte Array to decrypt: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
+		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
 		printBytesAsHex(byteArr);
 
 		output = cipherDES.doFinal(byteArr);
@@ -176,17 +219,28 @@ public class Lab3SecureChatClient {
 	// method overloading to make the boolean an optional parameter
 	public byte[] encryptRSA(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, true);
+		return encryptRSA(byteArr, serverKey, true);
+	}
+
+	public byte[] encryptRSA(byte[] byteArr, boolean pub)
+			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+		return encryptRSA(byteArr, null, pub);
 	}
 
 	// encrypts the byteArr fed into it using RSA algorithm
-	public byte[] encryptRSA(byte[] byteArr, boolean pub)
+	public byte[] encryptRSA(byte[] byteArr, PublicKey key, boolean pub)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+
 		byte[] output = null;
-		cipherDES.init(Cipher.ENCRYPT_MODE, puKey);
+
+		if (pub == true) {
+			cipherRSA.init(Cipher.ENCRYPT_MODE, key);
+		} else {
+			cipherRSA.init(Cipher.ENCRYPT_MODE, prKey);
+		}
 
 		System.out.println("Byte Array to encrypt: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
+		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
 		printBytesAsHex(byteArr);
 
 		output = cipherRSA.doFinal(byteArr);
@@ -199,17 +253,28 @@ public class Lab3SecureChatClient {
 	// method overloading to make the boolean an optional parameter
 	public byte[] decryptRSA(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, true);
+		return decryptRSA(byteArr, serverKey, true);
+	}
+
+	public byte[] decryptRSA(byte[] byteArr, PublicKey key)
+			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+		return decryptRSA(byteArr, key, true);
 	}
 
 	// Decrypts the byteArr fed into it using RSA algorithm
-	public byte[] decryptRSA(byte[] byteArr, boolean priv)
+	public byte[] decryptRSA(byte[] byteArr, PublicKey key, boolean priv)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+
 		byte[] output = null;
-		cipherRSA.init(Cipher.DECRYPT_MODE, prKey);
+
+		if (priv == true) {
+			cipherRSA.init(Cipher.DECRYPT_MODE, prKey);
+		} else {
+			cipherRSA.init(Cipher.DECRYPT_MODE, key);
+		}
 
 		System.out.println("Byte Array to decrypt: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
+		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
 		printBytesAsHex(byteArr);
 
 		output = cipherRSA.doFinal(byteArr);
@@ -233,6 +298,60 @@ public class Lab3SecureChatClient {
 			}
 		}
 		return output;
+	}
+
+	String generateNonce() {
+		String nonce = "";
+		// Initialization case
+		if (timeStamp == null) {
+			ctr = (int) (Math.random() * 846974);
+		} else {
+			// increment nonce
+			ctr++;
+		}
+		timeStamp = ZonedDateTime.now(ZoneId.of("UTC"));
+		nonce = CLIENT_ID + ";" + ctr + ";" + timeStamp.toString();
+		System.out.println("Generated nonce: " + nonce);
+		return nonce;
+	}
+
+	boolean parseNonce(String nonce) {
+		String id = "";
+		int counter;
+		String timeStamp = "";
+
+		try {
+			String tokens[] = nonce.split(";");
+			ZonedDateTime recvTime;
+			id = tokens[0];
+			counter = Integer.parseInt(tokens[1]);
+			timeStamp = tokens[2];
+
+			System.out.println("Nonce tokens: " + id + ", " + counter + ", " + timeStamp);
+
+			if (counter == this.ctr + 1) {
+				System.out.println("Counter is invalid: " + counter + " " + ctr);
+				return false;
+			}
+
+			recvTime = ZonedDateTime.parse(timeStamp);
+			Duration duration = Duration.between(recvTime, ZonedDateTime.now());
+			if (duration.getNano() < 0 || duration.getNano() >= 3000000000L) {
+				System.out.println("Invalid timestamp: " + recvTime + " " + this.timeStamp);
+				System.out.println(duration.getNano());
+				return false;
+			}
+
+			ctr = counter;
+			this.timeStamp = recvTime;
+			return true;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("Something went wrong, " + nonce);
+			return false;
+		}
+
 	}
 
 	public static void main(String[] args) {
