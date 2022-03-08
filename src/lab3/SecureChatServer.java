@@ -1,13 +1,18 @@
 package lab3;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.math.BigInteger;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
-import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -15,6 +20,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,86 +34,109 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESKeySpec;
+import javax.xml.crypto.dsig.keyinfo.X509IssuerSerial;
 
-public class Lab3SecureChatClient {
+public class SecureChatServer {
 
 	final static private int PACKET_SIZE = 1024;
 	final static private String ADDRESS = "0.0.0.0";
 	final static private int PORT = 8000;
-	final static private String CLIENT_ID = "client";
+	final static private String SERVER_ID = "server";
 
 	// Key-related objects
 	Cipher cipherDES = null;
 	Cipher cipherRSA = null;
 
 	PublicKey puKey;
-	PublicKey serverKey;
+	PublicKey clientKey;
 	PrivateKey prKey;
 	SecretKey sessionKey;
 
 	// Socket and input/output stream declarations
 	private Socket socket = null;
+	private ServerSocket server = null;
 	private InputStream input = null;
 	private OutputStream output = null;
 
+	private byte[] header = new byte[4];
 	// Buffer array representing a packet
 	private byte[] buf = new byte[PACKET_SIZE];
-	// Message array representing the byte form of a message
-	private byte[] byteMsg = new byte[PACKET_SIZE];
-	// Message String representing the string form of a message
+
+	private byte[] byteMsg = null;
+
 	private String strMsg = "";
 
-	// Verification variables
+	// counter (to prevent replay attacks) and client ID
+	private String clientID = "";
 	private int ctr = 0;
-	private ZonedDateTime timeStamp;
+	private ZonedDateTime timeStamp = ZonedDateTime.now(ZoneId.of("UTC"));
 
-	public Lab3SecureChatClient() {
+	public SecureChatServer() {
 		try {
 			initializeCiphers();
-			generateSessionKey();
 			generateKey();
+			createServer();
 			if (connect()) {
 				// Start of Asymmetric key distribution
-				// Send public key to server
-				sendMessage(puKey.getEncoded());
-				printBytesAsHex(puKey.getEncoded());
-
-				// Receive server's public key
+				// Retrieve public key from client and send server's public key
 				readMessage();
-				serverKey = createPublicKey(byteMsg);
+				clientKey = createPublicKey(byteMsg);
+				System.out.println("Received client's public key");
+
+				// Send server's public key to client
+				System.out.println("Sending server's public key to client");
+				buf = puKey.getEncoded();
+				sendMessage(buf);
 
 				// Start of Symmetric key distribution
-				// Step 1: Send client ID and nonce to server
-				strMsg = generateNonce();
-				System.out.println("Message: " + strMsg);
-				byteMsg = strMsg.getBytes();
-				byteMsg = encryptRSA(byteMsg);
-				sendMessage(byteMsg);
-				printBytesAsHex(byteMsg);
-
-				// Step 2: Receive nonce2 from server
+				// Step 1: Receive client ID, nonce, and timestamp from client
+				System.out.println("\nStep 1:");
 				readMessage();
 				byteMsg = decryptRSA(byteMsg);
 				strMsg = new String(byteMsg, StandardCharsets.UTF_8);
-				parseNonce(strMsg.split(",")[1]);
+				parseNonce(strMsg);
 
-				// Step 3: Send nonce3 back to server
-				strMsg = generateNonce();
-				System.out.println("Message: " + strMsg);
+				// Step 2: send N1|N2 to client
+				System.out.println("\nStep 2:");
+				strMsg = strMsg + "," + generateNonce();
 				byteMsg = strMsg.getBytes();
 				byteMsg = encryptRSA(byteMsg);
 				sendMessage(byteMsg);
 				printBytesAsHex(byteMsg);
+
+				// Step 3: Receive N3 from server
+				System.out.println("\nStep 3:");
+				readMessage();
+				byteMsg = decryptRSA(byteMsg);
+				if (parseNonce(new String(byteMsg, StandardCharsets.UTF_8))) {
+					System.out.println("Successfully verified client");
+				} else {
+					System.out.println("Failed to verify client. Closing connection.");
+					return;
+				}
+
+				// Step 4: Receive session key from server
+				System.out.println("\nStep 4:");
+				readMessage();
+				byteMsg = decryptRSA(byteMsg);
+				byteMsg = decryptRSA(byteMsg, clientKey);
+				getSessionKey(byteMsg);
 				
-				// Step 4: Send session key
-				byteMsg = encryptRSA(sessionKey.getEncoded(), false);
-				byteMsg = encryptRSA(byteMsg);
-				printBytesAsHex(byteMsg);
-				sendMessage(byteMsg);
+				// Main body of loop
+				
+				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+				
+				while (true) {
+					
+					break;
+				}
 
 			}
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
+		} catch (
+
+		Exception e) {
 			e.printStackTrace();
 		}
 	}
@@ -119,10 +148,33 @@ public class Lab3SecureChatClient {
 
 	void generateKey() throws NoSuchAlgorithmException {
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-		kpg.initialize(1024);
 		KeyPair kp = kpg.genKeyPair();
 		puKey = kp.getPublic();
 		prKey = kp.getPrivate();
+	}
+
+	void createServer() throws UnknownHostException, IOException {
+
+		// Step 1: Create Server
+		server = new ServerSocket();
+		server.bind(new InetSocketAddress(ADDRESS, PORT));
+		System.out.println("Server created: " + server.getInetAddress());
+		System.out.println("Waiting for client connection");
+
+	}
+
+	boolean connect() throws IOException {
+		socket = server.accept();
+		input = socket.getInputStream();
+		output = socket.getOutputStream();
+
+		if (socket.isConnected()) {
+			System.out.println("Connected to client");
+			return true;
+		} else {
+			System.out.println("Failed to connect to client");
+			return false;
+		}
 	}
 
 	PublicKey createPublicKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeySpecException {
@@ -131,29 +183,23 @@ public class Lab3SecureChatClient {
 		return kf.generatePublic(keySpec);
 	}
 
-	void generateSessionKey() throws NoSuchAlgorithmException {
-		// Key generation step
-		KeyGenerator kg = null;
-		kg = KeyGenerator.getInstance("DES");
-		sessionKey = kg.generateKey();
-	}
-
-	boolean connect() throws UnknownHostException, IOException {
-		// Step 1: Connect to server
-		socket = new Socket(ADDRESS, PORT);
-		input = socket.getInputStream();
-		output = socket.getOutputStream();
-
-		if (socket.isConnected()) {
-			System.out.println("Successfully connected to server");
-			return true;
-		} else {
-			System.out.println("Failed to connect");
-			return false;
-		}
+	void getSessionKey(byte[] byteKey) throws NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException {
+		System.out.println("Creating session key...");
+		SecretKeyFactory skf = SecretKeyFactory.getInstance("DES");
+		DESKeySpec spec = new DESKeySpec(byteKey);
+		sessionKey = skf.generateSecret(spec);
+		System.out.println("Session key created");
 	}
 
 	void readMessage() throws IOException {
+		int msgLen = 0;
+		// Receive length of message
+		header = input.readNBytes(4);
+		msgLen = ((header[0] & 0xff) << 0 | (header[1] & 0xff) << 8 | (header[2] & 0xff) << 16
+				| (header[3] & 0xff) << 24);
+		System.out.println("Message length: " + msgLen);
+
+		// Receive message
 		System.out.println("Message Received: ");
 		buf = input.readNBytes(PACKET_SIZE);
 		printBytesAsHex(buf);
@@ -161,24 +207,35 @@ public class Lab3SecureChatClient {
 	}
 
 	void sendMessage(byte[] msg) throws IOException {
+		int msgLen = msg.length;
+		// convert integer value message length into byte array and write
+		header[0] = (byte) (msgLen);
+		header[1] = (byte) (msgLen >> 8);
+		header[2] = (byte) (msgLen >> 16);
+		header[3] = (byte) (msgLen >> 24);
+		output.write(header);
+		output.flush();
+		System.out.println("Message to send length: " + msgLen);
+
 		if (msg.length <= PACKET_SIZE) {
 			buf = Arrays.copyOf(msg, PACKET_SIZE);
 			output.write(buf);
-			System.out.println("Wrote to server: ");
+			output.flush();
+			System.out.println("Wrote to client: ");
 			printBytesAsHex(buf);
 		} else {
 			for (int i = 0; i < msg.length; i++) {
 				// send message then start overwriting buffer
 				if (i % PACKET_SIZE == 0) {
 					output.write(buf);
-					System.out.println("Wrote to server: ");
+					output.flush();
+					System.out.println("Wrote to client: ");
 					printBytesAsHex(buf);
 				} else {
 					buf[i % PACKET_SIZE] = msg[i];
 				}
 			}
 		}
-		output.flush();
 	}
 
 	// Encrypts the byteArr fed into it as input
@@ -219,12 +276,12 @@ public class Lab3SecureChatClient {
 	// method overloading to make the boolean an optional parameter
 	public byte[] encryptRSA(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, serverKey, true);
+		return encryptRSA(byteArr, clientKey, true);
 	}
 
-	public byte[] encryptRSA(byte[] byteArr, boolean pub)
+	public byte[] encryptRSA(byte[] byteArr, PublicKey key)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, null, pub);
+		return encryptRSA(byteArr, key, true);
 	}
 
 	// encrypts the byteArr fed into it using RSA algorithm
@@ -253,12 +310,12 @@ public class Lab3SecureChatClient {
 	// method overloading to make the boolean an optional parameter
 	public byte[] decryptRSA(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, serverKey, true);
+		return decryptRSA(byteArr, clientKey, true);
 	}
 
 	public byte[] decryptRSA(byte[] byteArr, PublicKey key)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, key, true);
+		return decryptRSA(byteArr, key, false);
 	}
 
 	// Decrypts the byteArr fed into it using RSA algorithm
@@ -303,6 +360,7 @@ public class Lab3SecureChatClient {
 	String generateNonce() {
 		String nonce = "";
 		// Initialization case
+		System.out.println(timeStamp);
 		if (timeStamp == null) {
 			ctr = (int) (Math.random() * 846974);
 		} else {
@@ -310,7 +368,7 @@ public class Lab3SecureChatClient {
 			ctr++;
 		}
 		timeStamp = ZonedDateTime.now(ZoneId.of("UTC"));
-		nonce = CLIENT_ID + ";" + ctr + ";" + timeStamp.toString();
+		nonce = SERVER_ID + ";" + ctr + ";" + timeStamp.toString();
 		System.out.println("Generated nonce: " + nonce);
 		return nonce;
 	}
@@ -353,9 +411,9 @@ public class Lab3SecureChatClient {
 		}
 
 	}
-
-	public static void main(String[] args) {
-		Lab3SecureChatClient client = new Lab3SecureChatClient();
+	
+	public static void main (String[] args) {
+		SecureChatServer server = new SecureChatServer();
 	}
 
 	// Helper function for printing byte array into hex values
