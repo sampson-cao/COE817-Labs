@@ -1,6 +1,6 @@
 package lab3;
 
-import lab3.EncryptionUtil;
+import static lab3.EncryptionUtil.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,10 +39,7 @@ public class SecureChatClient{
 	final static private String CLIENT_ID = "client";
 
 
-
-	PublicKey puKey;
 	PublicKey serverKey;
-	PrivateKey prKey;
 	SecretKey sessionKey;
 
 	// Socket and input/output stream declarations
@@ -65,13 +62,12 @@ public class SecureChatClient{
 	public SecureChatClient() {
 		try {
 			initializeCiphers();
-			generateSessionKey();
-			generateKey();
+			generateRSAKeys();
 			if (connect()) {
 				// Start of Asymmetric key distribution
 				// Send public key to server
-				sendMessage(puKey.getEncoded());
-				printBytesAsHex(puKey.getEncoded());
+				sendMessage(getPublicKey().getEncoded());
+				printBytesAsHex(getPrivateKey().getEncoded());
 
 				// Receive server's public key
 				readMessage();
@@ -83,7 +79,7 @@ public class SecureChatClient{
 				strMsg = generateNonce();
 				System.out.println("Message: " + strMsg);
 				byteMsg = strMsg.getBytes();
-				byteMsg = encryptRSA(byteMsg);
+				byteMsg = encryptRSA(byteMsg, serverKey);
 				sendMessage(byteMsg);
 				printBytesAsHex(byteMsg);
 
@@ -99,14 +95,16 @@ public class SecureChatClient{
 				strMsg = generateNonce();
 				System.out.println("Message: " + strMsg);
 				byteMsg = strMsg.getBytes();
-				byteMsg = encryptRSA(byteMsg);
+				byteMsg = encryptRSA(byteMsg, serverKey);
 				sendMessage(byteMsg);
 				printBytesAsHex(byteMsg);
 
-				// Step 4: Send session key
+				// Step 4: Generate and send session key
 				System.out.println("\nStep 4:");
-				byteMsg = encryptRSA(sessionKey.getEncoded(), false);
-				byteMsg = encryptRSA(byteMsg);
+				generateSessionKey();
+				sessionKey = EncryptionUtil.getSessionKey();
+				byteMsg = encryptRSAPrivate(sessionKey.getEncoded());
+				byteMsg = encryptRSA(byteMsg, serverKey);
 				sendMessage(byteMsg);
 				System.out.println("Session key sent");
 				
@@ -123,31 +121,11 @@ public class SecureChatClient{
 			e.printStackTrace();
 		}
 	}
-
-	void initializeCiphers() throws NoSuchAlgorithmException, NoSuchPaddingException {
-		cipherDES = Cipher.getInstance("DES");
-		cipherRSA = Cipher.getInstance("RSA");
-	}
-
-	void generateKey() throws NoSuchAlgorithmException {
-		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-		kpg.initialize(1024);
-		KeyPair kp = kpg.genKeyPair();
-		puKey = kp.getPublic();
-		prKey = kp.getPrivate();
-	}
-
+	
 	PublicKey createPublicKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		X509EncodedKeySpec keySpec = new X509EncodedKeySpec(key);
 		KeyFactory kf = KeyFactory.getInstance("RSA");
 		return kf.generatePublic(keySpec);
-	}
-
-	void generateSessionKey() throws NoSuchAlgorithmException {
-		// Key generation step
-		KeyGenerator kg = null;
-		kg = KeyGenerator.getInstance("DES");
-		sessionKey = kg.generateKey();
 	}
 
 	boolean connect() throws UnknownHostException, IOException {
@@ -208,109 +186,6 @@ public class SecureChatClient{
 			}
 		}
 		output.flush();
-	}
-
-	// Encrypts the byteArr fed into it as input
-	public byte[] encryptDES(byte[] byteArr)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		byte[] output = null;
-		cipherDES.init(Cipher.ENCRYPT_MODE, sessionKey);
-
-		System.out.println("Byte Array to encrypt: ");
-		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
-		printBytesAsHex(byteArr);
-
-		output = cipherDES.doFinal(byteArr);
-		System.out.println("Byte Array encrypted: ");
-		System.out.println("String Representation: " + new String(output, StandardCharsets.UTF_8));
-		printBytesAsHex(output);
-		return output;
-
-	}
-
-	// Decrypts the byteArr fed into it as input
-	public byte[] decryptDES(byte[] byteArr)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		byte[] output = null;
-		cipherDES.init(Cipher.DECRYPT_MODE, sessionKey);
-
-		System.out.println("Byte Array to decrypt: ");
-		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
-		printBytesAsHex(byteArr);
-
-		output = cipherDES.doFinal(byteArr);
-		System.out.println("Byte Array decrypted: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
-		printBytesAsHex(output);
-		return output;
-	}
-
-	// method overloading to make the boolean an optional parameter
-	public byte[] encryptRSA(byte[] byteArr)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, serverKey, true);
-	}
-
-	public byte[] encryptRSA(byte[] byteArr, boolean pub)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, null, pub);
-	}
-
-	// encrypts the byteArr fed into it using RSA algorithm
-	public byte[] encryptRSA(byte[] byteArr, PublicKey key, boolean pub)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-
-		byte[] output = null;
-
-		if (pub == true) {
-			cipherRSA.init(Cipher.ENCRYPT_MODE, key);
-		} else {
-			cipherRSA.init(Cipher.ENCRYPT_MODE, prKey);
-		}
-
-		System.out.println("Byte Array to encrypt: ");
-		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
-		printBytesAsHex(byteArr);
-
-		output = cipherRSA.doFinal(byteArr);
-		System.out.println("Byte Array encrypted");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
-		printBytesAsHex(output);
-		return output;
-	}
-
-	// method overloading to make the boolean an optional parameter
-	public byte[] decryptRSA(byte[] byteArr)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, serverKey, true);
-	}
-
-	public byte[] decryptRSA(byte[] byteArr, PublicKey key)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, key, true);
-	}
-
-	// Decrypts the byteArr fed into it using RSA algorithm
-	public byte[] decryptRSA(byte[] byteArr, PublicKey key, boolean priv)
-			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-
-		byte[] output = null;
-
-		if (priv == true) {
-			cipherRSA.init(Cipher.DECRYPT_MODE, prKey);
-		} else {
-			cipherRSA.init(Cipher.DECRYPT_MODE, key);
-		}
-
-		System.out.println("Byte Array to decrypt: ");
-		System.out.println("String representation: " + new String(byteArr, StandardCharsets.UTF_8));
-		printBytesAsHex(byteArr);
-
-		output = cipherRSA.doFinal(byteArr);
-		System.out.println("Byte Array decrypted: ");
-		System.out.println("String representation: " + new String(output, StandardCharsets.UTF_8));
-		printBytesAsHex(output);
-		return output;
 	}
 
 	/**

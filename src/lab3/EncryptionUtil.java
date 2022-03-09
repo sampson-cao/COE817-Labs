@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -33,26 +34,43 @@ import javax.crypto.SecretKey;
  *
  */
 public class EncryptionUtil {
+	
+	private final static int PACKET_SIZE = 1024;
 
 	/** Cipher for DES algorithm */
-	Cipher cipherDES = null;
+	private static Cipher cipherDES = null;
 	/** Cipher for RSA algorithm */
-	Cipher cipherRSA = null;
+	private static Cipher cipherRSA = null;
 
 	/** User's own public key */
-	PublicKey puKey;
+	private static PublicKey puKey;
 	/** User's own private key */
-	PrivateKey prKey;
+	private static PrivateKey prKey;
 	/** Session key for the active chat instance */
-	SecretKey sessionKey;
+	private static SecretKey sessionKey;
 
 	/** Sets {@link sessionKey} */
-	void setSessionKey(SecretKey key) {
+	public void setSessionKey(SecretKey key) {
 		sessionKey = key;
+	}
+	
+	/** returns {@link sessionKey} */
+	public static SecretKey getSessionKey() {
+		return sessionKey;
+	}
+	
+	/** returns {@link puKey} */
+	public static Key getPublicKey() {
+		return puKey;
+	}
+	
+	/** returns {@link prKey} */
+	public static Key getPrivateKey() {
+		return prKey;
 	}
 
 	/** Initializes {@link cipherDES} and {@link cipherRSA} */
-	void initializeCiphers() throws NoSuchAlgorithmException, NoSuchPaddingException {
+	public static void initializeCiphers() throws NoSuchAlgorithmException, NoSuchPaddingException {
 		cipherDES = Cipher.getInstance("DES");
 		cipherRSA = Cipher.getInstance("RSA");
 	}
@@ -61,22 +79,25 @@ public class EncryptionUtil {
 	 * Generates the RSA key pair for public key {@link puKey} and private key
 	 * {@link prKey}
 	 */
-	void generateKey() throws NoSuchAlgorithmException {
+	public static void generateRSAKeys() throws NoSuchAlgorithmException {
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-		kpg.initialize(1024);
+		kpg.initialize(PACKET_SIZE);
 		KeyPair kp = kpg.genKeyPair();
 		puKey = kp.getPublic();
 		prKey = kp.getPrivate();
 	}
 
 	/** Generates session key {@link sessionKey} */
-	void generateSessionKey() throws NoSuchAlgorithmException {
+	public static void generateSessionKey() throws NoSuchAlgorithmException {
 		KeyGenerator kg = null;
 		kg = KeyGenerator.getInstance("DES");
 		sessionKey = kg.generateKey();
 	}
 
-	/** Encrypts the input byte array using the DES algorithm. Returns the cipher text*/
+	/**
+	 * Encrypts the input byte array using the DES algorithm. Returns the cipher
+	 * text
+	 */
 	public byte[] encryptDES(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 		byte[] output = null;
@@ -94,7 +115,9 @@ public class EncryptionUtil {
 
 	}
 
-	/** Decrypts the input byte array using the DES algorithm. Returns the plain text */
+	/**
+	 * Decrypts the input byte array using the DES algorithm. Returns the plain text
+	 */
 	public byte[] decryptDES(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 		byte[] output = null;
@@ -110,27 +133,50 @@ public class EncryptionUtil {
 		printBytesAsHex(output);
 		return output;
 	}
-
-	// method overloading to make the boolean an optional parameter
-	public byte[] encryptRSA(byte[] byteArr)
+	
+	/**
+	 * EncryptRSA method for encrypting with private key
+	 * {@link EncryptionUtil#encryptRSA(byte[], Key, boolean)
+	 * 
+	 * @see EncryptionUtil#encryptRSA(byte[], Key, boolean)
+	 */
+	public static byte[] encryptRSAPrivate(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, pubKey, true);
+		return encryptRSA(byteArr, null, false);
 	}
 
-	public byte[] encryptRSA(byte[] byteArr, boolean pub)
+	/**
+	 * overloaded encryptRSA method for encryption using the provided key
+	 * {@link EncryptionUtil#encryptRSA(byte[], Key, boolean)
+	 * 
+	 * @see EncryptionUtil#encryptRSA(byte[], Key, boolean)
+	 */
+	public static byte[] encryptRSA(byte[] byteArr, PublicKey key)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return encryptRSA(byteArr, null, pub);
+		return encryptRSA(byteArr, key, true);
 	}
+	
 
-	// encrypts the byteArr fed into it using RSA algorithm
-	public byte[] encryptRSA(byte[] byteArr, PublicKey key, boolean pub)
+	/**
+	 * encrypts the byteArr with the provided public key or the user's private key
+	 * if pub = true
+	 */
+	public static byte[] encryptRSA(byte[] byteArr, PublicKey key, boolean pub)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 
 		byte[] output = null;
 
 		if (pub == true) {
+			
+			if (key == null) {
+				System.out.println("Key must be defined");
+				return null;
+			}
+			
+			System.out.println("Encrypting with public key");
 			cipherRSA.init(Cipher.ENCRYPT_MODE, key);
 		} else {
+			System.out.println("Encrypting with private key");
 			cipherRSA.init(Cipher.ENCRYPT_MODE, prKey);
 		}
 
@@ -145,19 +191,33 @@ public class EncryptionUtil {
 		return output;
 	}
 
-	// method overloading to make the boolean an optional parameter
-	public byte[] decryptRSA(byte[] byteArr)
+	/**
+	 * overloaded decryptRSA method making the key and boolean pub/priv key optional
+	 * {@link EncryptionUtil#decryptRSA(byte[], Key, boolean)
+	 * 
+	 * @see EncryptionUtil#decryptRSA(byte[], Key, boolean)
+	 */
+	public static byte[] decryptRSA(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, serverKey, true);
+		return decryptRSA(byteArr, prKey, true);
 	}
 
-	public byte[] decryptRSA(byte[] byteArr, PublicKey key)
+	/**
+	 * overloaded decryptRSA method for decryption using provided key
+	 * {@link EncryptionUtil#decryptRSA(byte[], Key, boolean)
+	 * 
+	 * @see EncryptionUtil#decryptRSA(byte[], Key, boolean)
+	 */
+	public static byte[] decryptRSA(byte[] byteArr, PublicKey key)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-		return decryptRSA(byteArr, key, true);
+		return decryptRSA(byteArr, key, false);
 	}
 
-	// Decrypts the byteArr fed into it using RSA algorithm
-	public byte[] decryptRSA(byte[] byteArr, PublicKey key, boolean priv)
+	/**
+	 * decrypts the byteArr with the provided key or the user's private key if priv
+	 * = true
+	 */
+	public static byte[] decryptRSA(byte[] byteArr, Key key, boolean priv)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 
 		byte[] output = null;
@@ -179,7 +239,7 @@ public class EncryptionUtil {
 		return output;
 	}
 
-	// Helper function for printing byte array into hex values
+	/** Prints a byteArr in hexadecimal format */
 	public static void printBytesAsHex(byte[] byteArr) {
 		StringBuilder byteArray = new StringBuilder();
 		System.out.print("Byte representation: ");
