@@ -79,9 +79,9 @@ public class EncryptionUtil {
 	 * Generates the RSA key pair for public key {@link puKey} and private key
 	 * {@link prKey}
 	 */
-	public static void generateRSAKeys() throws NoSuchAlgorithmException {
+	public static void generateRSAKeys(int keySize) throws NoSuchAlgorithmException {
 		KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-		kpg.initialize(PACKET_SIZE);
+		kpg.initialize(keySize);
 		KeyPair kp = kpg.genKeyPair();
 		puKey = kp.getPublic();
 		prKey = kp.getPrivate();

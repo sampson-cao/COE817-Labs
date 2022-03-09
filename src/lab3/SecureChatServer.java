@@ -73,7 +73,10 @@ public class SecureChatServer {
 	public SecureChatServer() {
 		try {
 			initializeCiphers();
-			generateRSAKeys();
+			/* server key size is double client's key size to enable double encryption 
+			 * during session key transmission
+			 */
+			generateRSAKeys(PACKET_SIZE * 2);
 			createServer();
 			if (connect()) {
 				// Start of Asymmetric key distribution
@@ -119,8 +122,9 @@ public class SecureChatServer {
 				readMessage();
 				byteMsg = decryptRSA(byteMsg);
 				byteMsg = decryptRSA(byteMsg, clientKey);
-				getSessionKey();
+				sessionKey = EncryptionUtil.getSessionKey();
 				
+				System.out.println("Client successfully verified");
 				// Main body of loop
 				
 				BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
