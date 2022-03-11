@@ -1,23 +1,13 @@
 package lab3;
 
-import java.io.IOException;
-import java.net.Socket;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.Key;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
-import java.time.Duration;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.Arrays;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -50,7 +40,7 @@ public class EncryptionUtil {
 	private static SecretKey sessionKey;
 
 	/** Sets {@link sessionKey} */
-	public void setSessionKey(SecretKey key) {
+	public static void setSessionKey(SecretKey key) {
 		sessionKey = key;
 	}
 	
@@ -58,7 +48,7 @@ public class EncryptionUtil {
 	public static SecretKey getSessionKey() {
 		return sessionKey;
 	}
-	
+
 	/** returns {@link puKey} */
 	public static Key getPublicKey() {
 		return puKey;
@@ -98,7 +88,7 @@ public class EncryptionUtil {
 	 * Encrypts the input byte array using the DES algorithm. Returns the cipher
 	 * text
 	 */
-	public byte[] encryptDES(byte[] byteArr)
+	public static byte[] encryptDES(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 		byte[] output = null;
 		cipherDES.init(Cipher.ENCRYPT_MODE, sessionKey);
@@ -118,7 +108,7 @@ public class EncryptionUtil {
 	/**
 	 * Decrypts the input byte array using the DES algorithm. Returns the plain text
 	 */
-	public byte[] decryptDES(byte[] byteArr)
+	public static byte[] decryptDES(byte[] byteArr)
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 		byte[] output = null;
 		cipherDES.init(Cipher.DECRYPT_MODE, sessionKey);
