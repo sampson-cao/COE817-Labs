@@ -168,7 +168,7 @@ public class SecureChatServer implements Entity {
 		}
 		timeStamp = ZonedDateTime.now(ZoneId.of("UTC"));
 		nonce = SERVER_ID + ";" + ctr + ";" + timeStamp.toString();
-		System.out.println("Generated nonce: " + nonce);
+		System.out.println("Generated nonce: " + nonce + "\n");
 		return nonce;
 	}
 

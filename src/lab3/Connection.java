@@ -37,9 +37,8 @@ public class Connection {
 	/**
 	 * Creates a connection provided user id, address, and port
 	 * 
-	 * @param id
-	 * @param address
-	 * @param port
+	 * @param address address of connection
+	 * @param port port of connection
 	 */
 	public Connection(String address, int port) {
 		this.address = address;
@@ -128,7 +127,7 @@ public class Connection {
 	/**
 	 * Sends the byte array provided over the socket
 	 * 
-	 * @param msg
+	 * @param msg msg in byte array format
 	 * @throws IOException
 	 */
 	void sendMessage(byte[] msg) throws IOException {
@@ -165,7 +164,7 @@ public class Connection {
 	/**
 	 * Prints to console a byte array in hexadecimal format
 	 * 
-	 * @param byteArr
+	 * @param byteArr byte array to print as hex
 	 */
 	public static void printBytesAsHex(byte[] byteArr) {
 		StringBuilder byteArray = new StringBuilder();
