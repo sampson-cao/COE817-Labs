@@ -3,6 +3,7 @@ package project;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -10,6 +11,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.security.MessageDigest;
 
 import javax.crypto.BadPaddingException;
@@ -67,6 +70,16 @@ public class EncryptionUtil {
 	public static void initializeCiphers() throws NoSuchAlgorithmException, NoSuchPaddingException {
 		cipherDES = Cipher.getInstance("DES");
 		cipherRSA = Cipher.getInstance("RSA");
+	}
+	
+	/**
+	 * Generates an RSA public key provided a byte array key
+	 * @param key - encoded byte array of a key
+	 * @return public key
+	 */
+	public static PublicKey createPublicKey(byte[] key) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		KeyFactory kf = KeyFactory.getInstance("RSA");
+		return kf.generatePublic(new X509EncodedKeySpec(key));
 	}
 
 	/**
@@ -149,7 +162,6 @@ public class EncryptionUtil {
 			throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 		return encryptRSA(byteArr, key, true);
 	}
-	
 
 	/**
 	 * encrypts the byteArr with the provided public key or the user's private key

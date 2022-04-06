@@ -17,7 +17,7 @@ import java.util.Arrays;
  * @author Sampson Cao
  *
  */
-public class Connection {
+public class TCPConnection {
 
 	/** Transmission packet size in bytes */
 	final private static int PACKET_SIZE = 1024;
@@ -43,7 +43,7 @@ public class Connection {
 	 * @param address address of connection
 	 * @param port    port of connection
 	 */
-	public Connection(String address, int port) {
+	public TCPConnection(String address, int port) {
 		this.address = address;
 		this.port = port;
 	}

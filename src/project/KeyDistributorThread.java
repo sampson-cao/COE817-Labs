@@ -13,7 +13,7 @@ public class KeyDistributorThread extends Thread{
 	private String address = "localhost";
 	private int port = 3000;
 	
-	private Connection connection;
+	private TCPConnection connection;
 	private ServerSocket server;
 	private Socket socket;
 	private String id;
@@ -33,7 +33,7 @@ public class KeyDistributorThread extends Thread{
 			// Create new server with Address and port
 			server = new ServerSocket();
 			server.bind(new InetSocketAddress(address, port));
-			connection = new Connection(address, port);
+			connection = new TCPConnection(address, port);
 			
 			while (true) {
 				System.out.println("Waiting for client to connect...");

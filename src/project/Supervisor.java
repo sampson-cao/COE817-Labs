@@ -3,6 +3,7 @@ package project;
 import static project.EncryptionUtil.*;
 
 import java.security.Key;
+import java.security.PublicKey;
 
 public class Supervisor {
 
@@ -14,7 +15,11 @@ public class Supervisor {
 	final static private int PURCHASER_PORT = 3000;
 	final static private int ORDERS_DEPT_PORT = 3002;
 	
-	private Connection connection = null;
+	private TCPConnection connection = null;
+	
+	// Public keys of the other clients
+	public PublicKey puKeyPurchaser;
+	public PublicKey puKeyOrdersDept;
 
 	// Message array representing the byte form of a message
 	private byte[] byteMsg = new byte[PACKET_SIZE];
@@ -28,12 +33,24 @@ public class Supervisor {
 			
 			startKeyDistributor(CLIENT_ID, getPublicKey());
 			
-			connection = new Connection(ADDRESS, PURCHASER_PORT);
-			
+			connection = new TCPConnection(ADDRESS, PURCHASER_PORT);
 			if (connection.clientConnect()){
 				byteMsg = connection.readMessage();
 				printBytesAsHex(byteMsg);
+				puKeyPurchaser = createPublicKey(byteMsg);
+				System.out.println("Received purchaser public key");
 			}
+			
+			connection = new TCPConnection(ADDRESS, ORDERS_DEPT_PORT);
+			if (connection.clientConnect()) {
+				byteMsg = connection.readMessage();
+				printBytesAsHex(byteMsg);
+				puKeyOrdersDept = createPublicKey(byteMsg);
+				System.out.println("Received orders dept public key");
+			}
+			
+			
+			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
