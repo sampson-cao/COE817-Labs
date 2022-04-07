@@ -1,10 +1,7 @@
 package project;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -15,7 +12,7 @@ public class mailServer extends Thread {
 	private DatagramSocket socket;
 	private boolean running;
 	private byte[] buf = new byte[1024];
-	private String[] user = { "purchaser", "supervisor", "department" };
+	private String[] user = { "purchaser", "supervisor", "orders" };
 	private UDPConnection udpConnection;
 	// touch these
 	public mailServer() throws SocketException {

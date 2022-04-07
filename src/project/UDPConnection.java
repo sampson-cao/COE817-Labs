@@ -65,7 +65,7 @@ public class UDPConnection {
 	 * Sends the provided byte message to the email server
 	 * @param msg input message
 	 */
-	public void sendMessage(byte[] msg) {
+	public void sendMessage(byte[] msg, int port) {
 		// convert integer value message length into a 4 byte header
 		Arrays.fill(buf, (byte) 0);
 
@@ -79,7 +79,7 @@ public class UDPConnection {
 
 		buf = Arrays.copyOf(buf, PACKET_SIZE);
 
-		packet = new DatagramPacket(buf, PACKET_SIZE, host, EMAIL_PORT);
+		packet = new DatagramPacket(buf, PACKET_SIZE, host, port);
 		packet.setData(buf);
 		System.out.println(new String(buf, StandardCharsets.UTF_8));
 
@@ -91,7 +91,7 @@ public class UDPConnection {
 			System.out.println("Unable to send packet");
 		}
 
-		System.out.print("Packet sent: ");
+		System.out.print("Packet of length sent: " + msgLen + " Data: ");
 		printBytesAsHex(buf);
 	}
 	
@@ -106,7 +106,7 @@ public class UDPConnection {
 		buf = packet.getData();
 		// Converts the 4 byte header into an integer value
 		int msgLen = ((buf[0] & 0xff) << 0 | (buf[1] & 0xff) << 8 | (buf[2] & 0xff) << 16 | (buf[3] & 0xff) << 24);
-		System.out.print("Received packet: ");
+		System.out.print("Received packet of length: " + msgLen + " Data: ");
 		printBytesAsHex(buf);
 		buf = Arrays.copyOfRange(buf, header.length, msgLen + header.length);
 		return buf;

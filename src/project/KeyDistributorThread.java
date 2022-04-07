@@ -1,12 +1,10 @@
 package project;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.Key;
-import java.security.PublicKey;
 
 public class KeyDistributorThread extends Thread{
 	
@@ -36,10 +34,10 @@ public class KeyDistributorThread extends Thread{
 			connection = new TCPConnection(address, port);
 			
 			while (true) {
-				System.out.println("Waiting for client to connect...");
+				System.out.println("[KeyDistributorThread] Waiting for client to connect...");
 				
 				if (connection.serverConnect(server)) {
-					System.out.println("Client connected, sending public key");
+					System.out.println("[KeyDistributorThread] Client connected, sending public key");
 					connection.sendMessage(key.getEncoded());
 					
 					connection.closeConnection();

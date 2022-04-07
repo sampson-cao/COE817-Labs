@@ -160,7 +160,7 @@ public class TCPConnection {
 		if (msg.length <= PACKET_SIZE) {
 			buf = Arrays.copyOf(msg, PACKET_SIZE);
 			output.write(buf);
-			System.out.println("Wrote: ");
+			System.out.print("Wrote: ");
 			printBytesAsHex(buf);
 		} else {
 			for (int i = 0; i < msg.length; i++) {

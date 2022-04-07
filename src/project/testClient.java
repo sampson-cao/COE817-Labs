@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.SocketException;
 import java.util.Scanner;
 
@@ -48,13 +50,16 @@ public class testClient {
         socket.close();
     }
     
-    public static void main(String[] args) {
-    	
-    	UDPConnection udpConnection = new UDPConnection("localhost", 6215);
+	public static void main(String[] args) throws IOException {
+		ServerSocket server = new ServerSocket();
+		server.bind(new InetSocketAddress("localhost", 4445));
+		// TCPConnection tcpConnection = new TCPConnection("localhost", 4445);
+		// tcpConnection.serverConnect(server);
+		UDPConnection udpConnection = new UDPConnection("localhost", 6251);
 		Scanner sc = new Scanner(System.in);
 		while(true) {
 			String a = sc.nextLine();
-			udpConnection.sendMessage(a.getBytes());
+			udpConnection.sendMessage(a.getBytes(), 4445);
 		}
     	
     	/*
