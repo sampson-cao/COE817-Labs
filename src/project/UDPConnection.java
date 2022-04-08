@@ -7,7 +7,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
@@ -81,7 +80,6 @@ public class UDPConnection {
 
 		packet = new DatagramPacket(buf, PACKET_SIZE, host, port);
 		packet.setData(buf);
-		System.out.println(new String(buf, StandardCharsets.UTF_8));
 
 		try {
 			socket.send(packet);
@@ -131,6 +129,10 @@ public class UDPConnection {
 			return null;
 		}
 		return outputStream.toByteArray();
+	}
+
+	public void UDPclose() {
+		socket.close();
 	}
 
 	/**

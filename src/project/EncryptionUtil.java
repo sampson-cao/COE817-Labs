@@ -6,6 +6,7 @@ import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -13,7 +14,6 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-import java.security.MessageDigest;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -27,7 +27,7 @@ import javax.crypto.SecretKey;
  * Helper class that generates and manages keys and functions involving
  * cryptography for the chat application
  * 
- * @author Sampson Cao
+ * @author Sampson Cao, Jared Leaman, Josh Vo
  *
  */
 public class EncryptionUtil {
@@ -249,6 +249,8 @@ public class EncryptionUtil {
 		byte[] output = null;
 		MessageDigest hash = MessageDigest.getInstance("SHA-256");
 		output = hash.digest(message);
+		System.out.print("Hashed message: ");
+		printBytesAsHex(output);
 		return output;
 	}
 	
@@ -258,14 +260,22 @@ public class EncryptionUtil {
 		prSignature.initSign(privateKey);
 		prSignature.update(message);
 		output  = prSignature.sign();
+		System.out.println("Signature: ");
+		printBytesAsHex(output);
 		return output;
 	}
 	
 	public static boolean verify(byte[] message, PublicKey publickey, byte[] signature) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+		System.out.println("Verifying signature of message: " + new String(message, StandardCharsets.UTF_8));
 		Signature pubSignature = Signature.getInstance("SHA256withRSA");
 		pubSignature.initVerify(publickey);
 		pubSignature.update(message);
 		boolean verified = pubSignature.verify(signature);
+		if (verified) {
+			System.out.println("Successfully verified message");
+		} else {
+			System.out.println("Failed to verify message");
+		}
 		return verified;
 	}
 

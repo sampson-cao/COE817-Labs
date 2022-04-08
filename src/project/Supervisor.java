@@ -6,6 +6,7 @@ import static project.EncryptionUtil.encryptRSA;
 import static project.EncryptionUtil.generateRSAKeys;
 import static project.EncryptionUtil.getPrivateKey;
 import static project.EncryptionUtil.getPublicKey;
+import static project.EncryptionUtil.hashMessage;
 import static project.EncryptionUtil.initializeCiphers;
 import static project.EncryptionUtil.printBytesAsHex;
 import static project.EncryptionUtil.signMessage;
@@ -14,6 +15,7 @@ import static project.EncryptionUtil.verify;
 import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Scanner;
 
 public class Supervisor {
 
@@ -52,7 +54,6 @@ public class Supervisor {
 			connection = new TCPConnection(ADDRESS, TCP_PURCHASER_PORT);
 			if (connection.clientConnect()) {
 				byteMsg = connection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeyPurchaser = createPublicKey(byteMsg);
 				System.out.println("Received purchaser public key");
 			}
@@ -60,38 +61,61 @@ public class Supervisor {
 			connection = new TCPConnection(ADDRESS, TCP_ORDERS_DEPT_PORT);
 			if (connection.clientConnect()) {
 				byteMsg = connection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeyOrdersDept = createPublicKey(byteMsg);
 				System.out.println("Received orders dept public key");
 			}
 
 			System.out.println("All keys received, proceeding to UDP step");
 
-			// UDPConnection udpConnection = new UDPConnection(ADDRESS, EMAIL_PORT);
 			UDPConnection udpConnection = new UDPConnection(ADDRESS, UDP_PORT);
 
-			// Receive Message from Purchaser
-			byte[] Emessage = udpConnection.receiveMessage();
-			byte[] purchaserSignature = udpConnection.receiveMessage();
+			while (true) {
 
-			System.out.print("Received Email message: ");
-			printBytesAsHex(Emessage);
-			System.out.print("\nSignature: ");
-			printBytesAsHex(purchaserSignature);
+				// Receive Message from Purchaser
+				System.out.println("Waiting for email message from purchaser...");
+				byte[] Emessage = udpConnection.receiveMessage();
+				System.out.println("Waiting for signature from purchaser...");
+				byte[] purchaserSignature = udpConnection.receiveMessage();
 
-			// Decrypt
-			byte[] decryptMsg = decryptRSA(Emessage);
+				// Decrypt
+				System.out.println("Decrypting message");
+				byte[] decryptMsg = decryptRSA(Emessage);
+				System.out.println("Hashing message");
+				byte[] hash = hashMessage(decryptMsg);
 
-			if (verify(decryptMsg, puKeyPurchaser, purchaserSignature)) {
-				// If approved encrypt with Order public key
-				// Get message hash and Sign with Supervisor private key
-				byte[] encryptedMsg = encryptRSA(decryptMsg, puKeyOrdersDept);
-				byte[] superSign = signMessage(decryptMsg, (PrivateKey) getPrivateKey());
+				// If successfully verified
+				if (verify(hash, puKeyPurchaser, purchaserSignature)) {
 
-				// send to orders department
-				udpConnection.sendMessage(encryptedMsg, UDP_ORDERS_DEPT_PORT);
-				udpConnection.sendMessage(superSign, UDP_ORDERS_DEPT_PORT);
+					System.out.println("Would you like to approve the order? yes/no");
+
+					Scanner sc = new Scanner(System.in);
+					String input = "";
+					while (true) {
+						input = sc.nextLine();
+
+						if (input.equals("yes")) {
+							// Encrypt with order dept public key
+							System.out.println("Encrypting message with Order Department public key");
+							byte[] encryptedMsg = encryptRSA(decryptMsg, puKeyOrdersDept);
+
+							// Sign with Supervisor private key
+							System.out.println("Signing message");
+							byte[] superSign = signMessage(hash, (PrivateKey) getPrivateKey());
+
+							System.out.print("Signature: ");
+							printBytesAsHex(superSign);
+
+							// send to orders department
+							System.out.println("Sending message to orders department");
+							udpConnection.sendMessage(encryptedMsg, UDP_ORDERS_DEPT_PORT);
+							udpConnection.sendMessage(superSign, UDP_ORDERS_DEPT_PORT);
+						}
+						break;
+
+					}
+				}
 			}
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

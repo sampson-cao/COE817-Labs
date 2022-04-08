@@ -6,7 +6,6 @@ import static project.EncryptionUtil.generateRSAKeys;
 import static project.EncryptionUtil.getPublicKey;
 import static project.EncryptionUtil.hashMessage;
 import static project.EncryptionUtil.initializeCiphers;
-import static project.EncryptionUtil.printBytesAsHex;
 import static project.EncryptionUtil.verify;
 
 import java.security.Key;
@@ -49,7 +48,6 @@ public class OrdersDept {
 
 			if (connection.clientConnect()) {
 				byteMsg = connection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeyPurchaser = createPublicKey(byteMsg);
 				System.out.println("Received purchaser public key");
 			}
@@ -58,7 +56,6 @@ public class OrdersDept {
 
 			if (connection.clientConnect()) {
 				byteMsg = connection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeySupervisor = createPublicKey(byteMsg);
 				System.out.println("Received supervisor public key");
 			}
@@ -67,21 +64,33 @@ public class OrdersDept {
 
 			UDPConnection udpConnection = new UDPConnection(ADDRESS, UDP_PORT);
 
-			byte[] purchaserSignature = udpConnection.receiveMessage();
+			while (true) {
 
-			byte[] EMessage = udpConnection.receiveMessage();
-			byte[] superSignature = udpConnection.receiveMessage();
-			byte[] decryptMsg = decryptRSA(EMessage);
+				System.out.println("Waiting for Purchaser's signature...");
+				byte[] purchaserSignature = udpConnection.receiveMessage();
 
-			byte[] hash = hashMessage(decryptMsg);
+				System.out.println("Waiting for Email message from supervisor...");
+				byte[] EMessage = udpConnection.receiveMessage();
 
-			if (verify(decryptMsg, puKeyPurchaser, purchaserSignature)
-					&& verify(decryptMsg, puKeySupervisor, superSignature)) {
-				String message = "Order Approved";
-				udpConnection.sendMessage(message.getBytes(), UDP_PURCHASER_PORT);
-			} else {
-				String message = "Order Denied";
-				udpConnection.sendMessage(message.getBytes(), UDP_PURCHASER_PORT);
+				System.out.println("Waiting for Supervisor's signature...");
+				byte[] superSignature = udpConnection.receiveMessage();
+
+				System.out.println("Decrypting email");
+				byte[] decryptMsg = decryptRSA(EMessage);
+
+				byte[] hash = hashMessage(decryptMsg);
+
+				// If purchaser and supervisor is verfied
+				if (verify(hash, puKeyPurchaser, purchaserSignature) && verify(hash, puKeySupervisor, superSignature)) {
+
+					// Approve the order
+					String message = "Order Approved";
+					udpConnection.sendMessage(message.getBytes(), UDP_PURCHASER_PORT);
+				} else {
+					// Otherwise, deny the order
+					String message = "Order Denied";
+					udpConnection.sendMessage(message.getBytes(), UDP_PURCHASER_PORT);
+				}
 			}
 
 		} catch (Exception e) {

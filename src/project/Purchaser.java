@@ -14,6 +14,7 @@ import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Scanner;
 
 public class Purchaser {
 
@@ -48,72 +49,90 @@ public class Purchaser {
 			// Initialize elements
 			initializeCiphers();
 			generateRSAKeys(PACKET_SIZE);
-			
+
 			// Run key distributor thread to send keys to anyone who connects
 			// to this address
 			startKeyDistributor(CLIENT_ID, getPublicKey());
-			
+
 			// Start off by retrieving keys from the other entities
 			tcpConnection = new TCPConnection(ADDRESS, TCP_SUPERVISOR_PORT);
 			if (tcpConnection.clientConnect()) {
 				byteMsg = tcpConnection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeySupervisor = createPublicKey(byteMsg);
 				System.out.println("Received supervisor public key");
 			}
-			
+
 			tcpConnection = new TCPConnection(ADDRESS, TCP_ORDERS_DEPT_PORT);
 			if (tcpConnection.clientConnect()) {
 				byteMsg = tcpConnection.readMessage();
-				printBytesAsHex(byteMsg);
 				puKeyOrdersDept = createPublicKey(byteMsg);
 				System.out.println("Received order dept public key");
 			}
-			
+
 			System.out.println("All keys received, proceeding to UDP step");
-			
+
 			UDPConnection udpConnection = new UDPConnection(ADDRESS, UDP_PORT);
 
-			// udpConnection.sendMessage("hello world".getBytes());
-			String order = "Banana, 3, 0.99";
-			byte[] message = order.getBytes();
+			while (true) {
+				try {
+					String order = null;
+					Scanner input = new Scanner(System.in);
+					System.out.println("Enter item to purchase: ");
+					String item = input.nextLine();
+					String amount;
+					String cost;
+					byte[] message = null;
+					if (item != null) {
+						System.out.println("Quantity: ");
+						amount = input.nextLine();
+						if (Integer.parseInt(amount) >= 0) {
+							System.out.println("Cost per unit: ");
+							cost = input.nextLine();
+							if (Double.parseDouble(cost) >= 0) {
+								amount = amount.toString();
+								cost = cost.toString();
+								order = item + ", " + amount + ", " + cost;
+								message = order.getBytes();
+							} else {
+								System.out.println("Cost must be more than 0");
+							}
+						} else {
+							System.out.println("Amount must be more than 0");
+						}
 
-			System.out.println("Order to send: " + order);
-			printBytesAsHex(message);
+					} else {
+						System.out.println("Invalid item");
+					}
 
-			try {
-				byte[] hash = hashMessage(message);
+					// Sending order
+					System.out.println("Order to send: " + order);
+					printBytesAsHex(message);
 
-				System.out.print("Hashed message: ");
-				printBytesAsHex(hash);
+					byte[] hash = hashMessage(message);
 
-				// Get private key and sign hash with it
-				byte[] sign = signMessage(hash, (PrivateKey) getPrivateKey());
+					// Get private key and sign hash with it
+					byte[] sign = signMessage(hash, (PrivateKey) getPrivateKey());
 
-				System.out.println("Signature: ");
-				printBytesAsHex(sign);
 
-				// Encrypt with Supervisor Public Key
-				byte[] encryptedSendSuper = encryptRSA(message, puKeySupervisor);
-				udpConnection.sendMessage(encryptedSendSuper, UDP_SUPERVISOR_PORT);
-				udpConnection.sendMessage(sign, UDP_SUPERVISOR_PORT);
-				udpConnection.sendMessage(sign, UDP_ORDERS_DEPT_PORT);
+					// Encrypt hashed message with Supervisor Public Key
+					byte[] encryptedSendSuper = encryptRSA(message, puKeySupervisor);
+					System.out.println("Sending encrypted message to supervisor");
+					udpConnection.sendMessage(encryptedSendSuper, UDP_SUPERVISOR_PORT);
+					System.out.println("Sending signature to supervisor");
+					udpConnection.sendMessage(sign, UDP_SUPERVISOR_PORT);
+					System.out.println("Sending signature to order's department");
+					udpConnection.sendMessage(sign, UDP_ORDERS_DEPT_PORT);
 
-				byte[] recieved = udpConnection.receiveMessage();
-				String status = new String(recieved);
-				System.out.println(status);
-			} catch (NoSuchAlgorithmException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+					System.out.println("Waiting for confirmation message from order's department...");
+					byte[] recieved = udpConnection.receiveMessage();
+					String status = new String(recieved);
+					System.out.println("Status of purchase order: " + status);
+
+
+				} catch (NoSuchAlgorithmException e) {
+					e.printStackTrace();
+				}
 			}
-
-			// Send to Supervisor & Orders Dept
-			/*
-			 * send(encryptedSendSuper,Super) send(hash,super) send(sign,super)
-			 * 
-			 * send(encryptedSendorders,orders) send(hash,orders) send(sign,orders)
-			 */;
-			// Wait for approve/denied from ordersdept
 
 		} catch (Exception e) {
 			e.printStackTrace();
